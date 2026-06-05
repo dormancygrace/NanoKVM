@@ -100,6 +100,15 @@ void publish_wifi_state(uint8_t state)
 	}
 }
 
+constexpr const char *USB_HID0_LINK = "/sys/kernel/config/usb_gadget/g0/configs/c.1/hid.GS0";
+constexpr const char *USB_HID1_LINK = "/sys/kernel/config/usb_gadget/g0/configs/c.1/hid.GS1";
+constexpr const char *USB_HID2_LINK = "/sys/kernel/config/usb_gadget/g0/configs/c.1/hid.GS2";
+
+bool path_exists(const char *path)
+{
+	return access(path, F_OK) == 0;
+}
+
 } // namespace
 
 int get_nic_state(const char* interface_name)
@@ -295,8 +304,10 @@ void kvm_update_usb_state()
 	else kvm_sys_state.usb_state = -1;
 	// hid_state & udisk_state (rndis_state单独处理)
 	if(kvm_sys_state.usb_state == 1){
-		if(access("/sys/kernel/config/usb_gadget/g0/configs/c.1/hid.GS*", F_OK) == 0) 
-			kvm_sys_state.hid_state = 1;
+		kvm_sys_state.hid_state =
+			path_exists(USB_HID0_LINK) ||
+			path_exists(USB_HID1_LINK) ||
+			path_exists(USB_HID2_LINK);
 		if(access("/sys/kernel/config/usb_gadget/g0/configs/c.1/mass_storage.disk0", F_OK) == 0) 
 			kvm_sys_state.udisk_state = 1;
 	} else {
