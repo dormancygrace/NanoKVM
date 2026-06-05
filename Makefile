@@ -24,7 +24,7 @@ VISION_BUILD_CMD := . ./home/build/MaixCDK/bin/activate && cd /home/build/NanoKV
 RELEASE_BUILD_CMD := /home/build/NanoKVM/scripts/build-in-container.sh
 
 .PHONY: help check-root builder-image rebuild-image check-image shell app support vision \
-        test-wifi-modules web release-build package release all clean
+        test-wifi-modules test-usb-scripts web release-build package release all clean
 
 # Default target
 all: app support
@@ -48,6 +48,7 @@ help:
 	@echo "  release-build - Build every riscv64 release artifact in one pass"
 	@echo "  package       - Assemble nanokvm_<VERSION>.tar.gz + latest.json"
 	@echo "  release       - release-build + web + package (needs VERSION=x.y.z)"
+	@echo "  test-usb-scripts - Run USB init script regression tests"
 	@echo "  clean         - Clean build artifacts"
 	@echo ""
 	@echo "Prerequisites:"
@@ -133,6 +134,10 @@ release:
 	@$(MAKE) release-build
 	@$(MAKE) web
 	@$(MAKE) package VERSION="$(VERSION)"
+
+test-usb-scripts:
+	@echo "Running USB init script tests..."
+	@sh tests/usb-init-scripts-test.sh
 
 # Clean build artifacts
 clean:
