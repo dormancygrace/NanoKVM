@@ -288,13 +288,16 @@ func (c *client) handleControl(messageType int, data []byte) {
 	}
 }
 
-func newOutboundFrame(isKeyFrame bool, timestamp int64, data []byte) *outboundFrame {
-	payload := make([]byte, 9+len(data))
+func newOutboundFrame(isKeyFrame bool, timestamp int64, storage []byte, data []byte) *outboundFrame {
+	payload := storage
+	if len(payload) != 9+len(data) {
+		payload = make([]byte, 9+len(data))
+		copy(payload[9:], data)
+	}
 	if isKeyFrame {
 		payload[0] = 1
 	}
 	binary.LittleEndian.PutUint64(payload[1:9], uint64(timestamp))
-	copy(payload[9:], data)
 
 	return &outboundFrame{
 		key:       isKeyFrame,
