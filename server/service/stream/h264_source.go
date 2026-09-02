@@ -88,6 +88,7 @@ func (s *H264Source) run() {
 	defer ticker.Stop()
 
 	vision := common.GetKvmVision()
+	vision.SetFPS(uint8(fps))
 	startTime := time.Now()
 
 	for range ticker.C {
@@ -105,6 +106,7 @@ func (s *H264Source) run() {
 
 		if screen.FPS != fps && screen.FPS != 0 {
 			fps = screen.FPS
+			vision.SetFPS(uint8(fps))
 			ticker.Reset(time.Second / time.Duration(fps))
 		}
 

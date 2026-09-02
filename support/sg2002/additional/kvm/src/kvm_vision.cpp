@@ -37,6 +37,7 @@
 #define default_mjpeg_qlty      60
 #define default_h264_qlty       1000
 #define default_h264_gop        30
+#define default_h264_fps        30
 #define fresh_frame_discard_count 5
 
 #define kvmv_data_buffer_size   4
@@ -1546,6 +1547,7 @@ bool jpg_dump(kvmv_data_t* dump_to, image::Image *raw)
 }
 
 uint8_t kvmvenc_gop = default_h264_gop;
+uint8_t kvmvenc_fps = default_h264_fps;
 kvm_venc_t kvm_venc;
 mmf_venc_cfg_t cfg;
 void init_venc_h264(uint16_t _width, uint16_t _height, uint16_t _qlty)
@@ -1556,8 +1558,8 @@ void init_venc_h264(uint16_t _width, uint16_t _height, uint16_t _qlty)
     cfg.fmt = mmf_invert_format_to_mmf(image::Format::FMT_YVU420SP);
     cfg.jpg_quality = 0;       // unused
     cfg.gop = kvmvenc_gop;
-    cfg.intput_fps = 60;
-    cfg.output_fps = 60;
+    cfg.intput_fps = kvmvenc_fps;
+    cfg.output_fps = kvmvenc_fps;
     cfg.bitrate = _qlty;  // 码率
 
     kvm_venc.mmf_venc_chn = default_venc_chn;
@@ -1614,6 +1616,18 @@ void set_h264_gop(uint8_t _gop)
     kvm_venc.enc_h264_init = 0; // call
     kvmvenc_gop = maxmin_data(100, 1, (int)_gop);
     debug("[kvmv] set_h264_gop = %d\n", kvmvenc_gop);
+}
+
+void set_h264_fps(uint8_t _fps)
+{
+    uint8_t fps = maxmin_data(60, 10, (int)_fps);
+    if (fps == kvmvenc_fps) {
+        return;
+    }
+
+    kvmvenc_fps = fps;
+    kvm_venc.enc_h264_init = 0;
+    debug("[kvmv] set_h264_fps = %d\n", kvmvenc_fps);
 }
 
 void set_frame_detact(uint8_t _frame_detact)
