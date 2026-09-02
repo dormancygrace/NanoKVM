@@ -3,6 +3,7 @@ package tailscale
 import (
 	"NanoKVM-Server/utils"
 	"bufio"
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -18,6 +19,16 @@ const (
 )
 
 type Cli struct{}
+
+type TsVersion struct {
+	Current string
+	Latest  string
+}
+
+type tailscaleVersionJSON struct {
+	MajorMinorPatch string `json:"majorMinorPatch"`
+	Upstream        string `json:"upstream"`
+}
 
 type TsStatus struct {
 	BackendState string `json:"BackendState"`
@@ -144,4 +155,74 @@ func (c *Cli) Login() (string, error) {
 func (c *Cli) Logout() error {
 	command := "tailscale logout"
 	return exec.Command("sh", "-c", command).Run()
+}
+
+func (c *Cli) Version(ctx context.Context, includeUpstream bool) (*TsVersion, error) {
+	args := []string{"version", "--json"}
+	if includeUpstream {
+		args = append(args, "--upstream")
+	}
+
+	output, err := exec.CommandContext(ctx, TailscalePath, args...).CombinedOutput()
+	if err != nil {
+		return nil, commandError("get tailscale version", output, err)
+	}
+
+	return parseVersion(output, includeUpstream)
+}
+
+func (c *Cli) Update(ctx context.Context) error {
+	output, err := exec.CommandContext(
+		ctx,
+		TailscalePath,
+		"update",
+		"--yes",
+		"--track=stable",
+	).CombinedOutput()
+	if err != nil {
+		return commandError("update tailscale", output, err)
+	}
+
+	return nil
+}
+
+func (c *Cli) IsRunning() bool {
+	return exec.Command("pidof", "tailscaled").Run() == nil
+}
+
+func parseVersion(output []byte, requireUpstream bool) (*TsVersion, error) {
+	// Some Tailscale builds print a warning before their JSON output.
+	if index := strings.IndexByte(string(output), '{'); index >= 0 {
+		output = output[index:]
+	}
+
+	var version tailscaleVersionJSON
+	if err := json.Unmarshal(output, &version); err != nil {
+		return nil, fmt.Errorf("parse tailscale version: %w", err)
+	}
+	if version.MajorMinorPatch == "" {
+		return nil, errors.New("parse tailscale version: current version is missing")
+	}
+	if requireUpstream && version.Upstream == "" {
+		return nil, errors.New("parse tailscale version: upstream version is missing")
+	}
+
+	return &TsVersion{
+		Current: version.MajorMinorPatch,
+		Latest:  version.Upstream,
+	}, nil
+}
+
+func commandError(action string, output []byte, err error) error {
+	const maxOutputLength = 2048
+
+	message := strings.TrimSpace(string(output))
+	if len(message) > maxOutputLength {
+		message = message[:maxOutputLength]
+	}
+	if message == "" {
+		return fmt.Errorf("%s: %w", action, err)
+	}
+
+	return fmt.Errorf("%s: %w: %s", action, err, message)
 }
