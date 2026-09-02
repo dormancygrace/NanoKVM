@@ -151,6 +151,7 @@ typedef struct {
 
 static priv_t priv;
 static g_priv_t g_priv;
+static VENC_PACK_S jpeg_pack_storage;
 static VENC_PACK_S venc_pack_storage[MMF_VENC_MAX_CHN][MMF_VENC_MAX_PACKS];
 
 #define MODULE_NAME "soph_vi"
@@ -1977,6 +1978,50 @@ int mmf_enc_jpg_push_with_quality(int ch, uint8_t *data, int w, int h, int forma
 	return s32Ret;
 }
 
+int mmf_enc_jpg_push_vi_with_quality(int ch, int vi_ch, int quality)
+{
+	if (ch < 0 || ch >= MMF_VENC_MAX_CHN || vi_ch < 0 || vi_ch >= MMF_VI_MAX_CHN
+		|| !priv.vi_frame_valid[vi_ch] || !priv.vi_frame_deferred[vi_ch]) {
+		printf("Invalid native JPEG frame. venc:%d vi:%d\r\n", ch, vi_ch);
+		return -1;
+	}
+	if (priv.enc_jpg_running) {
+		return 0;
+	}
+
+	VIDEO_FRAME_INFO_S *frame = &priv.vi_frame[vi_ch];
+	int width = frame->stVFrame.u32Width;
+	int height = frame->stVFrame.u32Height;
+	int format = frame->stVFrame.enPixelFormat;
+	if (format != PIXEL_FORMAT_NV21) {
+		printf("Unsupported native JPEG format:%d\r\n", format);
+		return -1;
+	}
+
+	if (!priv.enc_jpg_is_init || priv.enc_jpg_frame_w != width
+		|| priv.enc_jpg_frame_h != height || priv.enc_jpg_frame_fmt != format
+		|| priv.enc_jpg_quality != quality) {
+		mmf_enc_jpg_deinit(ch);
+		int ret = mmf_enc_jpg_init(ch, width, height, format, quality);
+		if (ret != CVI_SUCCESS) {
+			return ret;
+		}
+	}
+
+	CVI_S32 s32Ret = CVI_VENC_SendFrame(ch, frame, 1000);
+	if (s32Ret != CVI_SUCCESS) {
+		printf("CVI_VENC_SendFrame native JPEG failed with %#x, fallback to copy\n", s32Ret);
+		uint8_t *data = (uint8_t *)_mmf_map_vi_frame(vi_ch);
+		if (data == NULL) {
+			return s32Ret;
+		}
+		return mmf_enc_jpg_push_with_quality(ch, data, width, height, format, quality);
+	}
+
+	priv.enc_jpg_running = 1;
+	return s32Ret;
+}
+
 int mmf_enc_jpg_push(int ch, uint8_t *data, int w, int h, int format)
 {
 	UNUSED(ch);
@@ -2052,11 +2097,8 @@ int mmf_enc_jpg_pop(int ch, uint8_t **data, int *size)
 		return s32Ret;
 	}
 
-	priv.enc_jpeg_frame.pstPack = (VENC_PACK_S *)malloc(sizeof(VENC_PACK_S) * 1);
-	if (!priv.enc_jpeg_frame.pstPack) {
-		printf("Malloc failed!\r\n");
-		return -1;
-	}
+	memset(&jpeg_pack_storage, 0, sizeof(jpeg_pack_storage));
+	priv.enc_jpeg_frame.pstPack = &jpeg_pack_storage;
 
 	VENC_CHN_STATUS_S stStatus;
 	s32Ret = CVI_VENC_QueryStatus(ch, &stStatus);
@@ -2098,7 +2140,6 @@ int mmf_enc_jpg_free(int ch)
 	}
 
 	if (priv.enc_jpeg_frame.pstPack) {
-		free(priv.enc_jpeg_frame.pstPack);
 		priv.enc_jpeg_frame.pstPack = NULL;
 	}
 
