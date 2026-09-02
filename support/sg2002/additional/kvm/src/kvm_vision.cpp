@@ -51,6 +51,8 @@
 #define watchdog_temp_path      "/tmp/watchdog"
 #define watchdog_file           "/tmp/nanokvm_wd"
 #define vi_state_publish_interval_ms 10000U
+#define vi_detection_active_poll_ms 10U
+#define vi_detection_idle_poll_ms 100U
 
 #define LT6911_ADDR 	0x2B
 #define LT6911_READ 	0xFF
@@ -1440,7 +1442,11 @@ void* vi_subsystem_detection(void * arg)
             break;
         }
 
-		time::sleep_ms(10);
+		const uint32_t poll_interval_ms =
+			(kvmv_cfg.hdmi_mode == 0 || kvmv_cfg.vi_detect_state == 2)
+				? vi_detection_idle_poll_ms
+				: vi_detection_active_poll_ms;
+		time::sleep_ms(poll_interval_ms);
     }
     kvmv_cfg.thread_is_running = 0;
 }
