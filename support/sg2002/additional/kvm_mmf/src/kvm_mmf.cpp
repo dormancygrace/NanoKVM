@@ -29,6 +29,7 @@
 #define MMF_VI_MAX_CHN 			2		// manually limit the max channel number of vi
 #define MMF_RGN_MAX_NUM			16
 #define MMF_VENC_MAX_CHN		4
+#define MMF_VENC_MAX_PACKS		8
 
 #define MMF_VB_VI_ID			0
 
@@ -150,6 +151,7 @@ typedef struct {
 
 static priv_t priv;
 static g_priv_t g_priv;
+static VENC_PACK_S venc_pack_storage[MMF_VENC_MAX_CHN][MMF_VENC_MAX_PACKS];
 
 #define MODULE_NAME "soph_vi"
 
@@ -2382,38 +2384,35 @@ int mmf_venc_pop(int ch, mmf_stream_t *stream) {
 		return -1;
 	}
 
-	venc_stream->pstPack = (VENC_PACK_S *)malloc(sizeof(VENC_PACK_S) * 8);
-	if (!venc_stream->pstPack) {
-		printf("Malloc failed!\r\n");
-		return -1;
-	}
-
-
-	VENC_CHN_STATUS_S stStatus;
+	VENC_CHN_STATUS_S stStatus = {};
 	s32Ret = CVI_VENC_QueryStatus(ch, &stStatus);
 	if (s32Ret != CVI_SUCCESS) {
 		printf("CVI_VENC_QueryStatus failed with %#x\n", s32Ret);
 		return s32Ret;
 	}
 
-	if (stStatus.u32CurPacks > 0) {
-		s32Ret = CVI_VENC_GetStream(ch, venc_stream, 1000);
-		if (s32Ret != CVI_SUCCESS) {
-			printf("CVI_VENC_GetStream failed with %#x\n", s32Ret);
-			free(venc_stream->pstPack);
-			return s32Ret;
-		}
-	} else {
+	if (stStatus.u32CurPacks == 0) {
 		printf("CVI_VENC_QueryStatus find not pack\r\n");
-		free(venc_stream->pstPack);
 		return -1;
+	}
+	if (stStatus.u32CurPacks > MMF_VENC_MAX_PACKS) {
+		printf("pack count is too large! cnt:%d\r\n", stStatus.u32CurPacks);
+		return -1;
+	}
+
+	memset(venc_pack_storage[ch], 0, sizeof(venc_pack_storage[ch]));
+	venc_stream->pstPack = venc_pack_storage[ch];
+	s32Ret = CVI_VENC_GetStream(ch, venc_stream, 1000);
+	if (s32Ret != CVI_SUCCESS) {
+		printf("CVI_VENC_GetStream failed with %#x\n", s32Ret);
+		venc_stream->pstPack = NULL;
+		return s32Ret;
 	}
 
 	if (stream) {
 		stream->count = venc_stream->u32PackCount;
-		if (stream->count > 8) {
+		if (stream->count > MMF_VENC_MAX_PACKS) {
 			printf("pack count is too large! cnt:%d\r\n", stream->count);
-			free(venc_stream->pstPack);
 			return -1;
 		}
 		for (int i = 0; i < stream->count; i++) {
@@ -2448,7 +2447,6 @@ int mmf_venc_free(int ch) {
 	}
 
 	if (venc_stream->pstPack) {
-		free(venc_stream->pstPack);
 		venc_stream->pstPack = NULL;
 	}
 
