@@ -1,6 +1,6 @@
 import { useState } from 'react';
-import { Button, message, Modal } from 'antd';
-import { RefreshCwIcon } from 'lucide-react';
+import { message, Modal } from 'antd';
+import { LoaderCircleIcon, RefreshCwIcon } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import semver from 'semver';
 
@@ -74,8 +74,13 @@ export const Update = () => {
 
   return (
     <>
-      <div className="flex items-center justify-between py-2">
-        <div className="flex flex-col">
+      <button
+        type="button"
+        className="flex h-[40px] w-full cursor-pointer items-center justify-between space-x-6 rounded px-2 text-neutral-300 hover:bg-neutral-700/70 disabled:cursor-default"
+        disabled={isChecking || isUpdating}
+        onClick={checkForUpdates}
+      >
+        <div className="flex flex-col items-start">
           <span>{t('settings.update.title')}</span>
           {version && (
             <span className="text-xs text-neutral-500">
@@ -85,18 +90,12 @@ export const Update = () => {
           )}
         </div>
 
-        <Button
-          shape="round"
-          size="small"
-          loading={isChecking}
-          disabled={isUpdating}
-          onClick={checkForUpdates}
-        >
-          <div className="flex items-center justify-center px-1.5">
-            <RefreshCwIcon size={16} />
-          </div>
-        </Button>
-      </div>
+        {isChecking ? (
+          <LoaderCircleIcon className="animate-spin" size={16} />
+        ) : (
+          <RefreshCwIcon size={16} />
+        )}
+      </button>
 
       <Modal
         title={t('settings.update.title')}
