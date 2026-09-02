@@ -41,14 +41,22 @@ stop_services() {
     # The server owns VI/VPSS. Let it release MMF before stopping kvm_system.
     stop_process NanoKVM-Server
     stop_process kvm_system
-    rm -rf /tmp/kvm_system /tmp/server
+    rm -rf /tmp/kvm_system /tmp/serve
+}
+
+start_background() {
+    executable="$1"
+    log_target=/dev/null
+    [ -w /dev/console ] && log_target=/dev/console
+
+    nohup "$executable" </dev/null >"$log_target" 2>&1 &
 }
 
 start_services() {
     cp -r /kvmapp/kvm_system /tmp/
     if [ -f /kvmapp/kvm_new_app ]; then
         touch /tmp/.nanokvm_migrating
-        /tmp/kvm_system/kvm_system &
+        start_background /tmp/kvm_system/kvm_system
 
         # The legacy migration invokes this init script recursively and starts
         # the server itself. Wait for that single migration path to finish.
@@ -63,13 +71,13 @@ start_services() {
         done
         rm -f /tmp/.nanokvm_migrating
     else
-        /tmp/kvm_system/kvm_system &
+        start_background /tmp/kvm_system/kvm_system
     fi
 
     if ! pidof NanoKVM-Server >/dev/null 2>&1; then
-        rm -rf /tmp/server
+        rm -rf /tmp/serve
         cp -r /kvmapp/server /tmp/
-        /tmp/server/NanoKVM-Server &
+        start_background /tmp/server/NanoKVM-Serve
     fi
 }
 
