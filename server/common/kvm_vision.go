@@ -145,7 +145,7 @@ func (k *KvmVision) SetFPS(fps uint8) {
 	}
 
 	_fps := C.uint8_t(fps)
-	C.set_h264_fps(_fps)
+	C.set_h264_fps_if_available(_fps)
 }
 
 func (k *KvmVision) SetFrameDetect(frame uint8) {
