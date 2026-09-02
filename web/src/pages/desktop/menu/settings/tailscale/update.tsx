@@ -76,25 +76,19 @@ export const Update = () => {
     <>
       <button
         type="button"
-        className="flex h-[40px] w-full cursor-pointer items-center justify-between space-x-6 rounded px-2 text-neutral-300 hover:bg-neutral-700/70 disabled:cursor-default"
+        className="flex h-[40px] w-full cursor-pointer items-center justify-between space-x-6 rounded border-0 bg-transparent px-2 text-left text-neutral-300 hover:bg-neutral-700/70 disabled:cursor-default"
         disabled={isChecking || isUpdating}
         onClick={checkForUpdates}
       >
-        <div className="flex flex-col items-start">
-          <span>{t('settings.update.title')}</span>
-          {version && (
-            <span className="text-xs text-neutral-500">
-              {version.current}
-              {version.current !== version.latest && ` -> ${version.latest}`}
-            </span>
-          )}
-        </div>
+        <span>{t('settings.update.title')}</span>
 
-        {isChecking ? (
-          <LoaderCircleIcon className="animate-spin" size={16} />
-        ) : (
-          <RefreshCwIcon size={16} />
-        )}
+        <span className="flex w-[35px] shrink-0 justify-center">
+          {isChecking ? (
+            <LoaderCircleIcon className="animate-spin" size={16} />
+          ) : (
+            <RefreshCwIcon size={16} />
+          )}
+        </span>
       </button>
 
       <Modal
