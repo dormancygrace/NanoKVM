@@ -137,6 +137,17 @@ func (k *KvmVision) SetGop(gop uint8) {
 	C.set_h264_gop(_gop)
 }
 
+func (k *KvmVision) SetFPS(fps uint8) {
+	k.mutex.Lock()
+	defer k.mutex.Unlock()
+	if k.closed {
+		return
+	}
+
+	_fps := C.uint8_t(fps)
+	C.set_h264_fps(_fps)
+}
+
 func (k *KvmVision) SetFrameDetect(frame uint8) {
 	k.mutex.RLock()
 	defer k.mutex.RUnlock()
