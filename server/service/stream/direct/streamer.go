@@ -111,7 +111,7 @@ func (s *Streamer) run() {
 			continue
 		}
 
-		outbound := newOutboundFrame(frame.Result == 3, frame.Timestamp, frame.Data)
+		outbound := newOutboundFrame(frame.Result == 3, frame.Timestamp, frame.Storage, frame.Data)
 		for _, client := range clients {
 			client.offer(outbound)
 		}

@@ -8,6 +8,7 @@ import (
 )
 
 type H264Frame struct {
+	Storage   []byte
 	Data      []byte
 	Result    int
 	Duration  time.Duration
@@ -108,7 +109,7 @@ func (s *H264Source) run() {
 			ticker.Reset(time.Second / time.Duration(fps))
 		}
 
-		data, result := vision.ReadH264(screen.Width, screen.Height, screen.BitRate)
+		storage, data, result := vision.ReadH264WithHeadroom(screen.Width, screen.Height, screen.BitRate, 9)
 		if result < 0 {
 			frame := H264Frame{Result: result}
 			for _, subscription := range subscribers {
@@ -121,6 +122,7 @@ func (s *H264Source) run() {
 		}
 
 		frame := H264Frame{
+			Storage:   storage,
 			Data:      data,
 			Result:    result,
 			Duration:  time.Second / time.Duration(fps),

@@ -4,6 +4,7 @@ package common
 	#cgo CFLAGS: -I../include
 	#cgo LDFLAGS: -L../dl_lib -lkvm
 	#include "kvm_vision.h"
+	#include <string.h>
 */
 import "C"
 import (
@@ -66,10 +67,15 @@ func (k *KvmVision) ReadMjpeg(width uint16, height uint16, quality uint16) (data
 }
 
 func (k *KvmVision) ReadH264(width uint16, height uint16, bitRate uint16) (data []byte, result int) {
+	_, data, result = k.ReadH264WithHeadroom(width, height, bitRate, 0)
+	return
+}
+
+func (k *KvmVision) ReadH264WithHeadroom(width uint16, height uint16, bitRate uint16, headroom int) (storage []byte, data []byte, result int) {
 	k.mutex.RLock()
 	defer k.mutex.RUnlock()
-	if k.closed {
-		return nil, -1
+	if k.closed || headroom < 0 {
+		return nil, nil, -1
 	}
 
 	var (
@@ -91,7 +97,11 @@ func (k *KvmVision) ReadH264(width uint16, height uint16, bitRate uint16) (data 
 	}
 	defer C.free_kvmv_data(&kvmData)
 
-	data = C.GoBytes(unsafe.Pointer(kvmData), C.int(dataSize))
+	storage = make([]byte, headroom+int(dataSize))
+	data = storage[headroom:]
+	if dataSize != 0 {
+		C.memcpy(unsafe.Pointer(&data[0]), unsafe.Pointer(kvmData), C.size_t(dataSize))
+	}
 	return
 }
 
