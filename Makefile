@@ -24,7 +24,7 @@ VISION_BUILD_CMD := . ./home/build/MaixCDK/bin/activate && cd /home/build/NanoKV
 RELEASE_BUILD_CMD := /home/build/NanoKVM/scripts/build-in-container.sh
 
 .PHONY: help check-root builder-image rebuild-image check-image shell app support vision \
-        web release-build package release all clean
+        test-wifi-modules web release-build package release all clean
 
 # Default target
 all: app support
@@ -42,6 +42,7 @@ help:
 	@echo "  app           - Build Go application server"
 	@echo "  support       - Build kvm_system daemon"
 	@echo "  vision        - Build video libraries (libkvm.so)"
+	@echo "  test-wifi-modules - Test Wi-Fi module selection"
 	@echo "  web           - Build the frontend into web/dist"
 	@echo "  all           - Build both app and support (default)"
 	@echo "  release-build - Build every riscv64 release artifact in one pass"
@@ -103,6 +104,9 @@ support: check-root builder-image
 vision: check-root builder-image
 	@echo "Building vision..."
 	@$(DOCKER_RUN_BASE) $(DOCKER_TTY) $(IMAGE_NAME) /bin/bash -c '$(VISION_BUILD_CMD)'
+
+test-wifi-modules:
+	@sh tools/test-s25wifimod.sh
 
 # Build every riscv64 release artifact in one container pass
 release-build: check-root builder-image
