@@ -3,6 +3,7 @@ package config
 import (
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 )
@@ -30,7 +31,7 @@ func TestLoadOrCreateJWTSecretPersistsValue(t *testing.T) {
 	if err != nil {
 		t.Fatalf("stat JWT secret: %v", err)
 	}
-	if mode := info.Mode().Perm(); mode != 0o600 {
+	if mode := info.Mode().Perm(); runtime.GOOS != "windows" && mode != 0o600 {
 		t.Fatalf("JWT secret mode = %o, want 600", mode)
 	}
 }
@@ -53,7 +54,7 @@ func TestLoadOrCreateJWTSecretKeepsConfiguredFile(t *testing.T) {
 	if err != nil {
 		t.Fatalf("stat JWT secret: %v", err)
 	}
-	if mode := info.Mode().Perm(); mode != 0o600 {
+	if mode := info.Mode().Perm(); runtime.GOOS != "windows" && mode != 0o600 {
 		t.Fatalf("JWT secret mode = %o, want 600", mode)
 	}
 }
