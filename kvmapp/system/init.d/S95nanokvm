@@ -23,13 +23,10 @@ stop_process() {
         return
     fi
 
-    killall -INT "$process" 2>/dev/null || true
-    if wait_for_exit "$process" 20; then
-        return
-    fi
-
+    # Non-interactive shells start asynchronous jobs with SIGINT ignored.
+    # SIGTERM is handled by NanoKVM-Server and reaches detached services.
     killall -TERM "$process" 2>/dev/null || true
-    if wait_for_exit "$process" 5; then
+    if wait_for_exit "$process" 10; then
         return
     fi
 
