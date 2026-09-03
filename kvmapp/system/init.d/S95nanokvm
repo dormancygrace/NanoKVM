@@ -41,7 +41,7 @@ stop_services() {
     # The server owns VI/VPSS. Let it release MMF before stopping kvm_system.
     stop_process NanoKVM-Server
     stop_process kvm_system
-    rm -rf /tmp/kvm_system /tmp/serve
+    rm -rf /tmp/kvm_system /tmp/server
 }
 
 start_background() {
@@ -75,9 +75,9 @@ start_services() {
     fi
 
     if ! pidof NanoKVM-Server >/dev/null 2>&1; then
-        rm -rf /tmp/serve
+        rm -rf /tmp/server
         cp -r /kvmapp/server /tmp/
-        start_background /tmp/server/NanoKVM-Serve
+        start_background /tmp/server/NanoKVM-Server
     fi
 }
 
