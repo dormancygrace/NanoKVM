@@ -152,7 +152,6 @@ typedef struct {
 static priv_t priv;
 static g_priv_t g_priv;
 static VENC_PACK_S venc_pack_storage[MMF_VENC_MAX_CHN][MMF_VENC_MAX_PACKS];
-static VENC_PACK_S jpeg_pack_storage;
 
 #define MODULE_NAME "soph_vi"
 
@@ -2089,6 +2088,10 @@ int mmf_enc_jpg_push(int ch, uint8_t *data, int w, int h, int format)
 
 	return s32Ret;
 }
+
+// Keep JPEG-specific storage beside the JPEG stream path. Besides making the
+// ownership clearer, this avoids colliding with unrelated global VENC storage.
+static VENC_PACK_S jpeg_pack_storage;
 
 int mmf_enc_jpg_pop(int ch, uint8_t **data, int *size)
 {
