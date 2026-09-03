@@ -1,14 +1,68 @@
 #!/bin/sh
 
-if [ "$1" = "start" ]
+: "${NANOKVM_DISK:=/dev/mmcblk0}"
+: "${NANOKVM_ROOT_PART:=/dev/mmcblk0p2}"
+: "${NANOKVM_ROOT_START_FILE:=/sys/class/block/mmcblk0p2/start}"
+: "${NANOKVM_ROOT_SIZE_FILE:=/sys/class/block/mmcblk0p2/size}"
+: "${NANOKVM_ROOT_READY_MARKER:=/etc/kvm.rootfs-resized}"
+: "${NANOKVM_ROOT_END_SECTOR:=16000000}"
+: "${NANOKVM_PARTED:=parted}"
+: "${NANOKVM_RESIZE2FS:=resize2fs}"
+
+read_uint_file() {
+        value=$(cat "$1" 2>/dev/null) || return 1
+        case "$value" in
+                ''|*[!0-9]*) return 1 ;;
+        esac
+        printf '%s\n' "$value"
+}
+
+root_partition_end_sector() {
+        start=$(read_uint_file "$NANOKVM_ROOT_START_FILE") || return 1
+        size=$(read_uint_file "$NANOKVM_ROOT_SIZE_FILE") || return 1
+        [ "$size" -gt 0 ] || return 1
+        printf '%s\n' "$((start + size - 1))"
+}
+
+prepare_root_filesystem() {
+        current_end=$(root_partition_end_sector) || {
+                echo "Could not read root partition geometry; leaving it unchanged" >&2
+                return 1
+        }
+
+        if [ "$current_end" -lt "$NANOKVM_ROOT_END_SECTOR" ]
+        then
+                # The official image starts with a 1.5 GiB root partition. Grow
+                # it directly to the intended 8,192,000,000-byte boundary.
+                # Do not extend it to the end of the card and shrink it back on
+                # every boot: that needlessly rewrites the partition table and
+                # can overlap an existing data partition after interruption.
+                rm -f "$NANOKVM_ROOT_READY_MARKER"
+                "$NANOKVM_PARTED" -s "$NANOKVM_DISK" unit s \
+                        resizepart 2 "${NANOKVM_ROOT_END_SECTOR}s" || return 1
+                current_end=$NANOKVM_ROOT_END_SECTOR
+        elif [ "$current_end" -gt "$NANOKVM_ROOT_END_SECTOR" ]
+        then
+                # An interrupted legacy boot may have left p2 extended to the
+                # end of the card. Never shrink a partition around a mounted
+                # filesystem; keep the larger safe geometry instead.
+                echo "root partition already extends beyond the default boundary; not shrinking it" >&2
+        fi
+
+        ready_end=$(read_uint_file "$NANOKVM_ROOT_READY_MARKER") || ready_end=
+        if [ "$ready_end" != "$current_end" ]
+        then
+                # Run synchronously so an interrupted first boot retries before
+                # claiming that the filesystem fills the resized partition.
+                rm -f "$NANOKVM_ROOT_READY_MARKER"
+                "$NANOKVM_RESIZE2FS" "$NANOKVM_ROOT_PART" || return 1
+                printf '%s\n' "$current_end" > "$NANOKVM_ROOT_READY_MARKER" || return 1
+        fi
+}
+
+if [ "${1:-}" = "start" ]
 then
-                # use all sdcard free space for data
-                parted -s /dev/mmcblk0 "resizepart 2 -0"
-                echo "yes
-                8192MB
-                " | parted ---pretend-input-tty /dev/mmcblk0 "resizepart 2 8192MB"
-                # resize data filesystem
-                (resize2fs /dev/mmcblk0p2) &
+        prepare_root_filesystem || echo "root filesystem resize deferred" >&2
 
 
         . /etc/profile
