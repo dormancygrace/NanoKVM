@@ -26,7 +26,16 @@ const (
 	restartDelay        = time.Second
 )
 
-var updateMutex sync.Mutex
+var operationMutex sync.Mutex
+
+func beginOperation(c *gin.Context, rsp *proto.Response) bool {
+	if operationMutex.TryLock() {
+		return true
+	}
+
+	rsp.ErrRsp(c, -1, "another tailscale operation is in progress")
+	return false
+}
 
 var StateMap = map[string]proto.TailscaleState{
 	"NoState":          proto.TailscaleNotRunning,
@@ -44,6 +53,10 @@ func NewService() *Service {
 
 func (s *Service) Install(c *gin.Context) {
 	var rsp proto.Response
+	if !beginOperation(c, &rsp) {
+		return
+	}
+	defer operationMutex.Unlock()
 
 	if !isInstalled() {
 		if err := install(); err != nil {
@@ -60,12 +73,10 @@ func (s *Service) Install(c *gin.Context) {
 
 func (s *Service) Uninstall(c *gin.Context) {
 	var rsp proto.Response
-
-	if !updateMutex.TryLock() {
-		rsp.ErrRsp(c, -1, "tailscale update already in progress")
+	if !beginOperation(c, &rsp) {
 		return
 	}
-	defer updateMutex.Unlock()
+	defer operationMutex.Unlock()
 
 	_ = NewCli().Stop()
 	_ = utils.DelGoMemLimit()
@@ -79,6 +90,10 @@ func (s *Service) Uninstall(c *gin.Context) {
 
 func (s *Service) Start(c *gin.Context) {
 	var rsp proto.Response
+	if !beginOperation(c, &rsp) {
+		return
+	}
+	defer operationMutex.Unlock()
 
 	err := NewCli().Start()
 	if err != nil {
@@ -97,6 +112,10 @@ func (s *Service) Start(c *gin.Context) {
 
 func (s *Service) Restart(c *gin.Context) {
 	var rsp proto.Response
+	if !beginOperation(c, &rsp) {
+		return
+	}
+	defer operationMutex.Unlock()
 
 	err := NewCli().Restart()
 	if err != nil {
@@ -111,6 +130,10 @@ func (s *Service) Restart(c *gin.Context) {
 
 func (s *Service) Stop(c *gin.Context) {
 	var rsp proto.Response
+	if !beginOperation(c, &rsp) {
+		return
+	}
+	defer operationMutex.Unlock()
 
 	err := NewCli().Stop()
 	if err != nil {
@@ -285,11 +308,15 @@ func (s *Service) Update(c *gin.Context) {
 		rsp.ErrRsp(c, -1, "tailscale not installed")
 		return
 	}
-	if !updateMutex.TryLock() {
-		rsp.ErrRsp(c, -2, "tailscale update already in progress")
+	if !beginOperation(c, &rsp) {
 		return
 	}
-	defer updateMutex.Unlock()
+	restartPending := false
+	defer func() {
+		if !restartPending {
+			operationMutex.Unlock()
+		}
+	}()
 
 	// Once an update starts, finish it even if the browser disconnects. This is
 	// especially important when NanoKVM itself is reached through Tailscale.
@@ -313,6 +340,10 @@ func (s *Service) Update(c *gin.Context) {
 
 	after, err := cli.Version(ctx, false)
 	if err != nil {
+		if wasRunning {
+			restartPending = true
+			restartTailscaleAfterResponse()
+		}
 		log.Errorf("failed to verify tailscale update: %s", err)
 		rsp.ErrRsp(c, -5, "failed to verify tailscale update")
 		return
@@ -330,13 +361,19 @@ func (s *Service) Update(c *gin.Context) {
 		// The Tailscale updater does not recognize NanoKVM's S98tailscaled
 		// Buildroot init script. Restart after sending the response so updating a
 		// device through its Tailscale address does not fail in the browser.
-		go func() {
-			time.Sleep(restartDelay)
-			if restartErr := NewCli().Restart(); restartErr != nil {
-				log.Errorf("tailscale updated but failed to restart: %s", restartErr)
-			}
-		}()
+		restartPending = true
+		restartTailscaleAfterResponse()
 	}
 
 	log.Infof("tailscale update completed: before=%s after=%s restarting=%t", before.Current, after.Current, restarting)
+}
+
+func restartTailscaleAfterResponse() {
+	go func() {
+		defer operationMutex.Unlock()
+		time.Sleep(restartDelay)
+		if restartErr := NewCli().Restart(); restartErr != nil {
+			log.Errorf("tailscale updated but failed to restart: %s", restartErr)
+		}
+	}()
 }
