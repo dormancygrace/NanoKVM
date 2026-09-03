@@ -289,8 +289,13 @@ func (c *client) handleControl(messageType int, data []byte) {
 }
 
 func newOutboundFrame(isKeyFrame bool, timestamp int64, storage []byte, data []byte) *outboundFrame {
+	reuseStorage := len(storage) == 9+len(data)
+	if reuseStorage && len(data) != 0 {
+		reuseStorage = &storage[9] == &data[0]
+	}
+
 	payload := storage
-	if len(payload) != 9+len(data) {
+	if !reuseStorage {
 		payload = make([]byte, 9+len(data))
 		copy(payload[9:], data)
 	}

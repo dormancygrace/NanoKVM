@@ -41,3 +41,16 @@ func TestNewOutboundFrameFallsBackWithoutHeadroom(t *testing.T) {
 		t.Fatalf("frame data = %v, want %v", frame.payload[9:], data)
 	}
 }
+
+func TestNewOutboundFrameFallsBackForUnrelatedStorage(t *testing.T) {
+	storage := make([]byte, 12)
+	data := []byte{8, 9, 10}
+	frame := newOutboundFrame(false, 11, storage, data)
+
+	if &frame.payload[0] == &storage[0] {
+		t.Fatal("payload reused storage that does not contain frame data")
+	}
+	if !bytes.Equal(frame.payload[9:], data) {
+		t.Fatalf("frame data = %v, want %v", frame.payload[9:], data)
+	}
+}
