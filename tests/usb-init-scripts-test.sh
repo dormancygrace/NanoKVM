@@ -79,7 +79,6 @@ USB_HID_ABSOLUTE_MOUSE_FUNC="hid.GS2"
 USB_MASS_STORAGE_FUNC="mass_storage.disk0"
 USB_RNDIS_FUNC="rndis.usb0"
 USB_NCM_FUNC="ncm.usb0"
-USB_LEGACY_EMPTY_DISK_BACKING="/dev/mmcblk0p3"
 USB_TEST_IMAGE="/data/install.iso"
 USB_TEST_BASE_UID="nanokvm-test-uid"
 
@@ -359,7 +358,7 @@ test_normal_disable_hid_removes_hid_functions(){
     assert_no_hid_functions "${g}"
 }
 
-test_normal_legacy_mass_storage(){
+test_normal_empty_mass_storage_has_no_media(){
     base=$(new_env)
     : > "${base}/boot/usb.disk0"
     run_start "${NORMAL_SCRIPT}" "${base}"
@@ -367,7 +366,7 @@ test_normal_legacy_mass_storage(){
 
     assert_link "${g}/configs/c.1/${USB_MASS_STORAGE_FUNC}" "functions/${USB_MASS_STORAGE_FUNC}"
     assert_eq "$(cat "${g}/functions/${USB_MASS_STORAGE_FUNC}/lun.0/removable")" "1" "mass storage removable"
-    assert_eq "$(cat "${g}/functions/${USB_MASS_STORAGE_FUNC}/lun.0/file")" "${USB_LEGACY_EMPTY_DISK_BACKING}" "legacy empty disk backing"
+    assert_eq "$(cat "${g}/functions/${USB_MASS_STORAGE_FUNC}/lun.0/file")" "" "empty removable disk has no backing media"
 }
 
 test_normal_mounted_image_and_network(){
@@ -519,7 +518,7 @@ setup_fake_configfs_tools
 test_normal_hid_descriptors
 test_normal_bios_flag_keeps_only_boot_hid_interfaces
 test_normal_disable_hid_removes_hid_functions
-test_normal_legacy_mass_storage
+test_normal_empty_mass_storage_has_no_media
 test_normal_mounted_image_and_network
 test_network_restart_removes_os_desc_link
 test_ncm_network_descriptors
