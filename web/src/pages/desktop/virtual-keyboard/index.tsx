@@ -3,7 +3,7 @@ import { AppleOutlined, WindowsOutlined } from '@ant-design/icons';
 import clsx from 'clsx';
 import { useAtom } from 'jotai';
 import { XIcon } from 'lucide-react';
-import Keyboard, { KeyboardButtonTheme } from 'react-simple-keyboard';
+import KeyboardModule, { type KeyboardButtonTheme } from 'react-simple-keyboard';
 import { Drawer } from 'vaul';
 
 import 'react-simple-keyboard/build/css/index.css';
@@ -25,6 +25,16 @@ import {
   modifierKeys,
   specialKeyMap
 } from './virtual-keys.ts';
+
+// react-simple-keyboard publishes a UMD entry whose CommonJS default export is
+// another module-shaped object. Vite 8/Rolldown preserves that wrapper instead
+// of applying Vite 7's implicit second default unwrap.
+type KeyboardModuleShape = {
+  KeyboardReact?: typeof KeyboardModule;
+  default?: typeof KeyboardModule;
+};
+const keyboardModule = KeyboardModule as unknown as KeyboardModuleShape;
+const Keyboard = keyboardModule.KeyboardReact ?? keyboardModule.default ?? KeyboardModule;
 
 export const VirtualKeyboard = () => {
   const isBigScreen = useMediaQuery({ minWidth: 850 });
