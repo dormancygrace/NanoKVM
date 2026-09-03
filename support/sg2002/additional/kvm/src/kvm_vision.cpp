@@ -2004,19 +2004,27 @@ int kvmv_read_img(uint16_t _width, uint16_t _height, uint8_t _type, uint16_t _ql
 
 int free_kvmv_data(uint8_t ** _pp_kvm_data)
 {
-        // debug("[kvmv]free_kvmv_data - 1\r\n");
+    if(_pp_kvm_data == NULL){
+        return IMG_NOT_EXIST;
+    }
+
+    pthread_mutex_lock(&vi_mutex);
+    // debug("[kvmv]free_kvmv_data - 1\r\n");
     for(int i = 0; i < kvmv_data_buffer_size; i++){
         if(*_pp_kvm_data == kvmv_data_buffer[i].p_img_data){
             // debug("[kvmv]free buffer : %d\n", *_pp_kvm_data);
             if (*_pp_kvm_data != NULL){
                 kvmv_data_buffer[i].in_use = 0;
                 uint8_t _type = kvmv_data_buffer[i].img_data_type;
+                pthread_mutex_unlock(&vi_mutex);
                 return _type;
             } else {
+                pthread_mutex_unlock(&vi_mutex);
                 return IMG_NOT_EXIST;
             }
         }
     }
+    pthread_mutex_unlock(&vi_mutex);
     return IMG_NOT_EXIST;
 }
 
