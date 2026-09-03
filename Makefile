@@ -24,7 +24,7 @@ VISION_BUILD_CMD := . ./home/build/MaixCDK/bin/activate && cd /home/build/NanoKV
 RELEASE_BUILD_CMD := /home/build/NanoKVM/scripts/build-in-container.sh
 
 .PHONY: help check-root builder-image rebuild-image check-image shell app support vision \
-        test-wifi-modules test-usb-scripts test-root-resize web release-build package release all clean
+        test-wifi-modules test-usb-scripts test-root-resize test-wifi-runtime web release-build package release all clean
 
 # Default target
 all: app support
@@ -50,6 +50,7 @@ help:
 	@echo "  release       - release-build + web + package (needs VERSION=x.y.z)"
 	@echo "  test-usb-scripts - Run USB init script regression tests"
 	@echo "  test-root-resize - Test idempotent root filesystem expansion"
+	@echo "  test-wifi-runtime - Test Wi-Fi runtime state and credential permissions"
 	@echo "  clean         - Clean build artifacts"
 	@echo ""
 	@echo "Prerequisites:"
@@ -142,6 +143,10 @@ test-usb-scripts:
 
 test-root-resize:
 	@sh tools/test-s01fs-root-resize.sh
+
+test-wifi-runtime:
+	@sh tools/test-s30wifi-runtime.sh
+	@cd server && go test ./service/network
 
 # Clean build artifacts
 clean:
