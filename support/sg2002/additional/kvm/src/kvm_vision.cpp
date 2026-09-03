@@ -58,6 +58,10 @@
 
 pthread_mutex_t vi_mutex;
 pthread_mutex_t hdmi_signal_mutex = PTHREAD_MUTEX_INITIALIZER;
+static pthread_t vi_detection_thread;
+static pthread_t watchdog_thread;
+static uint8_t vi_detection_thread_started = 0;
+static uint8_t watchdog_thread_started = 0;
 
 static char NanoKVM_edit[] = {
 	0x00,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0x00,0x41,0x0C,0x33,0xC2,0x66,0xBA,0x00,0x00,
@@ -1121,7 +1125,7 @@ void* watchdog_sf_feed(void * arg)
 {
     while(true)
     {
-        if(kvmv_cfg.try_exit_thread == 1)
+        if(__atomic_load_n(&kvmv_cfg.try_exit_thread, __ATOMIC_ACQUIRE) == 1)
             break;
         time::sleep_ms(500);
         if (watchdog_sf_is_open()){
@@ -1196,7 +1200,7 @@ void* vi_subsystem_detection(void * arg)
     last_vi_state_refresh_ms = vi_state_shared::monotonic_ms() - vi_state_publish_interval_ms;
     while(true)
     {
-        if(kvmv_cfg.try_exit_thread == 1)
+        if(__atomic_load_n(&kvmv_cfg.try_exit_thread, __ATOMIC_ACQUIRE) == 1)
             break;
 
         uint8_t get_new_hdmi_mode = get_hdmi_mode();
@@ -1686,7 +1690,6 @@ int8_t raw_to_h264(image::Image *raw, kvmv_data_t* ret_stream, uint16_t _qlty)
 
 void kvmv_init(uint8_t _debug_info_en)
 {
-    pthread_t thread;
     pthread_mutex_init(&vi_mutex, NULL);
     if(_debug_info_en == 0) debug_en = 0;
     else                    debug_en = 1;
@@ -1700,20 +1703,26 @@ void kvmv_init(uint8_t _debug_info_en)
         kvmv_data_buffer[i].p_img_data = NULL;
     }
 
-    kvmv_cfg.try_exit_thread = 0;
+    __atomic_store_n(&kvmv_cfg.try_exit_thread, 0, __ATOMIC_RELEASE);
     // debug("[kvmv]kvmv_init - 2\r\n");
 
-    if(kvmv_cfg.thread_is_running == 1){
+    if(kvmv_cfg.thread_is_running == 1 || vi_detection_thread_started == 1){
         debug("[kvmv]thread is running!\r\n");
     } else {
-        if (0 != pthread_create(&thread, NULL, vi_subsystem_detection, NULL)) {
+        if (0 != pthread_create(&vi_detection_thread, NULL, vi_subsystem_detection, NULL)) {
             debug("[kvmv]create vi_subsystem_detection thread failed!\r\n");
             // return -1;
+        } else {
+            vi_detection_thread_started = 1;
         }
+    }
 
-        if (0 != pthread_create(&thread, NULL, watchdog_sf_feed, NULL)) {
+    if (watchdog_thread_started == 0) {
+        if (0 != pthread_create(&watchdog_thread, NULL, watchdog_sf_feed, NULL)) {
             debug("[kvmv]create watchdog_sf_feed thread failed!\r\n");
             // return -1;
+        } else {
+            watchdog_thread_started = 1;
         }
     }
     // debug("[kvmv]kvmv_init - 3\r\n");
@@ -1978,12 +1987,21 @@ void free_all_kvmv_data()
 
 void kvmv_deinit()
 {
+    __atomic_store_n(&kvmv_cfg.try_exit_thread, 1, __ATOMIC_RELEASE);
+    if (vi_detection_thread_started == 1) {
+        pthread_join(vi_detection_thread, NULL);
+        vi_detection_thread_started = 0;
+    }
+    if (watchdog_thread_started == 1) {
+        pthread_join(watchdog_thread, NULL);
+        watchdog_thread_started = 0;
+    }
+
     set_hdmi_capture_enabled(0);
-    pthread_mutex_destroy(&vi_mutex);
-    kvmv_cfg.try_exit_thread = 1;
     cam->close();
     mmf_deinit();
     free_all_kvmv_data();
+    pthread_mutex_destroy(&vi_mutex);
 }
 
 uint8_t kvmv_hdmi_control(uint8_t _en)
