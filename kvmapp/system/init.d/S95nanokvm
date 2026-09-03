@@ -43,10 +43,7 @@ stop_services() {
 
 start_background() {
     executable="$1"
-    log_target=/dev/null
-    [ -w /dev/console ] && log_target=/dev/console
-
-    nohup "$executable" </dev/null >"$log_target" 2>&1 &
+    nohup "$executable" </dev/null >/dev/null 2>&1 &
 }
 
 start_services() {
