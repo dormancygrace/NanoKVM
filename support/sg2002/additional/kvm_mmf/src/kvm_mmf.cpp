@@ -2101,20 +2101,11 @@ int mmf_enc_jpg_pop(int ch, uint8_t **data, int *size)
 		return s32Ret;
 	}
 
-	VENC_CHN_STATUS_S stStatus = {};
-	s32Ret = CVI_VENC_QueryStatus(ch, &stStatus);
-	if (s32Ret != CVI_SUCCESS) {
-		printf("CVI_VENC_QueryStatus failed with %#x\n", s32Ret);
-		return s32Ret;
-	}
-
-	if (stStatus.u32CurPacks != 1) {
-		printf("Unexpected JPEG pack count:%d\r\n", stStatus.u32CurPacks);
-		return -1;
-	}
-
 	memset(&jpeg_pack_storage, 0, sizeof(jpeg_pack_storage));
 	priv.enc_jpeg_frame.pstPack = &jpeg_pack_storage;
+	// JPEG produces one pack per frame. Go straight to the blocking call:
+	// QueryStatus can still report zero immediately after SendFrame and turn
+	// normal encoder latency into a spurious failure.
 	s32Ret = CVI_VENC_GetStream(ch, &priv.enc_jpeg_frame, 1000);
 	if (s32Ret != CVI_SUCCESS) {
 		printf("CVI_VENC_GetStream failed with %#x\n", s32Ret);
@@ -2126,6 +2117,9 @@ int mmf_enc_jpg_pop(int ch, uint8_t **data, int *size)
 	if (priv.enc_jpeg_frame.u32PackCount != 1 || pack->pu8Addr == NULL
 		|| pack->u32Offset > pack->u32Len) {
 		printf("Invalid JPEG stream pack\r\n");
+		CVI_VENC_ReleaseStream(ch, &priv.enc_jpeg_frame);
+		priv.enc_jpeg_frame.pstPack = NULL;
+		priv.enc_jpg_running = 0;
 		return -1;
 	}
 
