@@ -1596,7 +1596,9 @@ static int8_t frame_to_jpeg(int vi_ch, kvmv_data_t* dump_to, uint16_t quality)
     }
 
     if (!reserve_save_buffer(dump_to, (uint32_t)data_size)) {
-        mmf_enc_jpg_free(0);
+        if (mmf_enc_jpg_free(0) != 0) {
+            mmf_enc_jpg_deinit(0);
+        }
         mmf_vi_frame_release(vi_ch);
         return IMG_BUFFER_FULL;
     }
@@ -1604,7 +1606,11 @@ static int8_t frame_to_jpeg(int vi_ch, kvmv_data_t* dump_to, uint16_t quality)
     memcpy(dump_to->p_img_data, data, data_size);
     dump_to->img_data_size = data_size;
     dump_to->img_data_type = VENC_MJPEG;
-    mmf_enc_jpg_free(0);
+    if (mmf_enc_jpg_free(0) != 0) {
+        mmf_enc_jpg_deinit(0);
+        mmf_vi_frame_release(vi_ch);
+        return IMG_VENC_ERROR;
+    }
     mmf_vi_frame_release(vi_ch);
     return IMG_MJPEG_TYPE;
 }
