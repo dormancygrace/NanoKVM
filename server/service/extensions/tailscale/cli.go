@@ -11,11 +11,14 @@ import (
 	"os/exec"
 	"regexp"
 	"strings"
+	"time"
 )
 
 const (
 	ScriptPath       = "/etc/init.d/S98tailscaled"
 	ScriptBackupPath = "/kvmapp/system/init.d/S98tailscaled"
+
+	daemonStatePollInterval = 100 * time.Millisecond
 )
 
 type Cli struct{}
@@ -71,6 +74,36 @@ func (c *Cli) Restart() error {
 
 	command := strings.Join(commands, " && ")
 	return exec.Command("sh", "-c", command).Run()
+}
+
+// RestartAfterUpdate waits for the old daemon to exit before starting the new
+// binary. S98tailscaled reports success as soon as start-stop-daemon sends the
+// stop signal, so invoking its restart action directly can briefly run two
+// tailscaled processes after an update.
+func (c *Cli) RestartAfterUpdate(ctx context.Context) error {
+	return restartAfterUpdate(ctx, c.Stop, c.Start, c.IsRunning)
+}
+
+func restartAfterUpdate(ctx context.Context, stop, start func() error, isRunning func() bool) error {
+	if isRunning() {
+		if err := stop(); err != nil && isRunning() {
+			return fmt.Errorf("stop tailscale after update: %w", err)
+		}
+	}
+
+	if err := waitForDaemonState(ctx, false, daemonStatePollInterval, isRunning); err != nil {
+		return fmt.Errorf("wait for tailscaled to stop: %w", err)
+	}
+
+	if err := start(); err != nil {
+		return fmt.Errorf("start tailscale after update: %w", err)
+	}
+
+	if err := waitForDaemonState(ctx, true, daemonStatePollInterval, isRunning); err != nil {
+		return fmt.Errorf("wait for tailscaled to start: %w", err)
+	}
+
+	return nil
 }
 
 func (c *Cli) Stop() error {
@@ -188,6 +221,26 @@ func (c *Cli) Update(ctx context.Context) error {
 
 func (c *Cli) IsRunning() bool {
 	return exec.Command("pidof", "tailscaled").Run() == nil
+}
+
+func waitForDaemonState(ctx context.Context, wantRunning bool, pollInterval time.Duration, isRunning func() bool) error {
+	if isRunning() == wantRunning {
+		return nil
+	}
+
+	ticker := time.NewTicker(pollInterval)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-ticker.C:
+			if isRunning() == wantRunning {
+				return nil
+			}
+		}
+	}
 }
 
 func parseVersion(output []byte, requireUpstream bool) (*TsVersion, error) {
