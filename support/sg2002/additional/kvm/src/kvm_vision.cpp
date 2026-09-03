@@ -1173,6 +1173,7 @@ void* watchdog_sf_feed(void * arg)
             vision_update_watchdog();
         }
     }
+    return NULL;
 }
 
 void get_hdmi_version()
@@ -1487,6 +1488,7 @@ void* vi_subsystem_detection(void * arg)
 		time::sleep_ms(poll_interval_ms);
     }
     kvmv_cfg.thread_is_running = 0;
+    return NULL;
 }
 
 int sync_vi_res()
