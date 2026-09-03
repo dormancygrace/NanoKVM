@@ -51,7 +51,7 @@ case "$1" in
     # fi
     
     cp -r /kvmapp/server /tmp/
-    start_background /tmp/server/NanoKVM-Serve
+    start_background /tmp/server/NanoKVM-Server
   ;;
   stop)
     killall kvm_system
@@ -90,7 +90,7 @@ case "$1" in
     # fi
     
     cp -r /kvmapp/server /tmp/
-    start_background /tmp/server/NanoKVM-Serve
+    start_background /tmp/server/NanoKVM-Server
 
     sync
 
