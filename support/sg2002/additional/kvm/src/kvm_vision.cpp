@@ -1790,6 +1790,14 @@ int kvmv_read_img(uint16_t _width, uint16_t _height, uint8_t _type, uint16_t _ql
     if(mutex_res != 0){
         return -5;
     }
+    /* Auto-detection remains in vi_detect_state == 1 while HDMI is absent so
+       that a newly connected source is discovered.  Report the cable state
+       before that transient state; otherwise callers see an endless -4
+       ("Modifying image resolution") even though no signal is present. */
+    if (__atomic_load_n(&kvmv_cfg.hdmi_cable_state, __ATOMIC_ACQUIRE) == 0){
+        pthread_mutex_unlock(&vi_mutex);
+        return -1;
+    }
     if (kvmv_cfg.hdmi_res_err == ERROR_RES){
         pthread_mutex_unlock(&vi_mutex);
         return -7;
