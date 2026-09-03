@@ -2,14 +2,11 @@ package main
 
 import (
 	"log"
-	"net/http"
 	"os"
 	"os/signal"
 	"strconv"
 	"syscall"
 	"time"
-
-	_ "net/http/pprof"
 
 	"NanoKVM-Server/common"
 	"NanoKVM-Server/config"
@@ -37,13 +34,6 @@ func initialize() {
 	}
 
 	logger.Init()
-	if os.Getenv("NANOKVM_PPROF") == "1" {
-		go func() {
-			if err := http.ListenAndServe("127.0.0.1:6060", nil); err != nil {
-				log.Printf("pprof listener stopped: %v", err)
-			}
-		}()
-	}
 
 	// init screen parameters
 	_ = common.GetScreen()
