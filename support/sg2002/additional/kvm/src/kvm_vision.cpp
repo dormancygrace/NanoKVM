@@ -1588,6 +1588,7 @@ static int8_t frame_to_jpeg(int vi_ch, kvmv_data_t* dump_to, uint16_t quality)
 {
     int ret = mmf_enc_jpg_push_vi_with_quality(0, vi_ch, quality);
     if (ret != 0) {
+        release_save_buffer(dump_to);
         mmf_vi_frame_release(vi_ch);
         return IMG_VENC_ERROR;
     }
@@ -1597,17 +1598,18 @@ static int8_t frame_to_jpeg(int vi_ch, kvmv_data_t* dump_to, uint16_t quality)
     ret = mmf_enc_jpg_pop(0, &data, &data_size);
     if (ret != 0 || data == NULL || data_size <= 0) {
         mmf_enc_jpg_deinit(0);
+        release_save_buffer(dump_to);
         mmf_vi_frame_release(vi_ch);
         return IMG_VENC_ERROR;
     }
 
-    dump_to->p_img_data = (uint8_t *)malloc(data_size);
-    if (dump_to->p_img_data == NULL) {
+    if (!reserve_save_buffer(dump_to, static_cast<uint32_t>(data_size))) {
         dump_to->img_data_size = 0;
         dump_to->img_data_type = 0;
         if (mmf_enc_jpg_free(0) != 0) {
             mmf_enc_jpg_deinit(0);
         }
+        release_save_buffer(dump_to);
         mmf_vi_frame_release(vi_ch);
         return IMG_BUFFER_FULL;
     }
@@ -1617,10 +1619,9 @@ static int8_t frame_to_jpeg(int vi_ch, kvmv_data_t* dump_to, uint16_t quality)
     dump_to->img_data_type = VENC_MJPEG;
     if (mmf_enc_jpg_free(0) != 0) {
         mmf_enc_jpg_deinit(0);
-        free(dump_to->p_img_data);
-        dump_to->p_img_data = NULL;
         dump_to->img_data_size = 0;
         dump_to->img_data_type = 0;
+        release_save_buffer(dump_to);
         mmf_vi_frame_release(vi_ch);
         return IMG_VENC_ERROR;
     }
