@@ -45,7 +45,9 @@ export GOEXPERIMENT=boringcrypto
 export CC="$CC_COMPILER"
 export CGO_CFLAGS="$CGO_CFLAGS_OPTS"
 
-go build -o "$BINARY_NAME" -v
+# Release builds pass "-s -w" to omit the external symbol table and DWARF.
+# Keep this configurable so local diagnostic builds can retain full symbols.
+go build -ldflags="${GO_LDFLAGS:-}" -o "$BINARY_NAME" -v
 
 if [ -f "$BINARY_NAME" ]; then
     echo -e "${GREEN}[SUCCESS] Binary '$BINARY_NAME' created successfully.${NC}"
