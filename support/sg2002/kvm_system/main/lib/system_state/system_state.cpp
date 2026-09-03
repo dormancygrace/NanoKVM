@@ -2,6 +2,7 @@
 #include "system_state.h"
 #include "vi_state_shared.hpp"
 #include <arpa/inet.h>
+#include <errno.h>
 #include <fcntl.h>
 #include <time.h>
 #include <sys/wait.h>
@@ -254,7 +255,11 @@ int chack_net_state(ip_addr_t use_ip_type)
 	}
 
 	int status = 0;
-	if (waitpid(pid, &status, 0) != pid) {
+	pid_t wait_result;
+	do {
+		wait_result = waitpid(pid, &status, 0);
+	} while (wait_result < 0 && errno == EINTR);
+	if (wait_result != pid) {
 		return 0;
 	}
 	return WIFEXITED(status) && WEXITSTATUS(status) == 0 ? 1 : 0;
