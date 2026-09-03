@@ -37,7 +37,9 @@
 #define default_mjpeg_qlty      60
 #define default_h264_qlty       1000
 #define default_h264_gop        30
-#define default_h264_fps        30
+// Preserve the legacy library behaviour until the server supplies the user's
+// configured FPS through set_h264_fps().
+#define default_h264_fps        60
 #define fresh_frame_discard_count 5
 
 #define kvmv_data_buffer_size   4
