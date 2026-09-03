@@ -150,6 +150,7 @@ typedef struct {
 
 static priv_t priv;
 static g_priv_t g_priv;
+static VENC_PACK_S jpeg_pack_storage;
 
 #define MODULE_NAME "soph_vi"
 
@@ -2046,38 +2047,46 @@ int mmf_enc_jpg_push(int ch, uint8_t *data, int w, int h, int format)
 int mmf_enc_jpg_pop(int ch, uint8_t **data, int *size)
 {
 	CVI_S32 s32Ret = CVI_SUCCESS;
+	if (ch < 0 || ch >= MMF_VENC_MAX_CHN) {
+		printf("Invalid JPEG channel:%d\r\n", ch);
+		return -1;
+	}
 	if (!priv.enc_jpg_running) {
 		return s32Ret;
 	}
 
-	priv.enc_jpeg_frame.pstPack = (VENC_PACK_S *)malloc(sizeof(VENC_PACK_S) * 1);
-	if (!priv.enc_jpeg_frame.pstPack) {
-		printf("Malloc failed!\r\n");
-		return -1;
-	}
-
-	VENC_CHN_STATUS_S stStatus;
+	VENC_CHN_STATUS_S stStatus = {};
 	s32Ret = CVI_VENC_QueryStatus(ch, &stStatus);
 	if (s32Ret != CVI_SUCCESS) {
 		printf("CVI_VENC_QueryStatus failed with %#x\n", s32Ret);
 		return s32Ret;
 	}
 
-	if (stStatus.u32CurPacks > 0) {
-		s32Ret = CVI_VENC_GetStream(ch, &priv.enc_jpeg_frame, 1000);
-		if (s32Ret != CVI_SUCCESS) {
-			printf("CVI_VENC_GetStream failed with %#x\n", s32Ret);
-			return s32Ret;
-		}
-	} else {
-		printf("CVI_VENC_QueryStatus find not pack\r\n");
+	if (stStatus.u32CurPacks != 1) {
+		printf("Unexpected JPEG pack count:%d\r\n", stStatus.u32CurPacks);
+		return -1;
+	}
+
+	memset(&jpeg_pack_storage, 0, sizeof(jpeg_pack_storage));
+	priv.enc_jpeg_frame.pstPack = &jpeg_pack_storage;
+	s32Ret = CVI_VENC_GetStream(ch, &priv.enc_jpeg_frame, 1000);
+	if (s32Ret != CVI_SUCCESS) {
+		printf("CVI_VENC_GetStream failed with %#x\n", s32Ret);
+		priv.enc_jpeg_frame.pstPack = NULL;
+		return s32Ret;
+	}
+
+	VENC_PACK_S *pack = priv.enc_jpeg_frame.pstPack;
+	if (priv.enc_jpeg_frame.u32PackCount != 1 || pack->pu8Addr == NULL
+		|| pack->u32Offset > pack->u32Len) {
+		printf("Invalid JPEG stream pack\r\n");
 		return -1;
 	}
 
 	if (data)
-		*data = priv.enc_jpeg_frame.pstPack[0].pu8Addr;
+		*data = pack->pu8Addr + pack->u32Offset;
 	if (size)
-		*size = priv.enc_jpeg_frame.pstPack[0].u32Len;
+		*size = pack->u32Len - pack->u32Offset;
 
 	return s32Ret;
 }
@@ -2096,7 +2105,6 @@ int mmf_enc_jpg_free(int ch)
 	}
 
 	if (priv.enc_jpeg_frame.pstPack) {
-		free(priv.enc_jpeg_frame.pstPack);
 		priv.enc_jpeg_frame.pstPack = NULL;
 	}
 
