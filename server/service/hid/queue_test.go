@@ -2,7 +2,6 @@ package hid
 
 import (
 	"bytes"
-	"errors"
 	"io"
 	"os"
 	"path/filepath"
@@ -91,15 +90,15 @@ func TestMouseModeSwitchReleasesPreviousDevice(t *testing.T) {
 
 func TestKeyboardFailureCompletesAfterCleanup(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "hidg0")
-	file, err := os.OpenFile(path, os.O_CREATE|os.O_WRONLY, 0o600)
+	closedFile, err := os.OpenFile(path, os.O_CREATE|os.O_WRONLY, 0o600)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := file.Close(); err != nil {
+	if err := closedFile.Close(); err != nil {
 		t.Fatal(err)
 	}
 
-	h := &Hid{}
+	h := &Hid{g0: closedFile}
 	queue := make(chan QueuedReport, 1)
 	cleanupStarted := make(chan struct{})
 	allowCleanup := make(chan struct{})
@@ -110,9 +109,6 @@ func TestKeyboardFailureCompletesAfterCleanup(t *testing.T) {
 		Data: []byte{0, 0, 4, 0, 0, 0, 0, 0},
 		Execute: func(write func() error) error {
 			executions++
-			if executions == 1 {
-				return errors.New("forced write failure")
-			}
 			if executions == 2 {
 				close(cleanupStarted)
 				<-allowCleanup
