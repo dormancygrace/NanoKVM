@@ -1651,6 +1651,9 @@ int8_t frame_to_h264(uint8_t *data, int width, int height, int format, int vi_ch
         : mmf_venc_push(kvm_venc.mmf_venc_chn, data, width, height, format);
     if (push_ret) {
         mmf_del_venc_channel(kvm_venc.mmf_venc_chn);
+        if (vi_ch >= 0) {
+            mmf_vi_frame_release(vi_ch);
+        }
         kvm_venc.enc_h264_init = 0;
         // rtmp->unlock();
 		debug("[kvmv]mmf venc push failed!\n");
@@ -1947,6 +1950,9 @@ int kvmv_read_img(uint16_t _width, uint16_t _height, uint8_t _type, uint16_t _ql
             if(p_kvmv_data == NULL){
                 // buffer full
 			    delete img;
+                if(native_vi_ch >= 0){
+                    mmf_vi_frame_release(native_vi_ch);
+                }
                 *_pp_kvm_data = NULL;
                 pthread_mutex_unlock(&vi_mutex);
                 return IMG_BUFFER_FULL;
