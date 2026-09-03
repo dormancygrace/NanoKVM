@@ -24,6 +24,7 @@ const (
 	versionCheckTimeout = 30 * time.Second
 	updateTimeout       = 10 * time.Minute
 	restartDelay        = time.Second
+	restartTimeout      = 30 * time.Second
 )
 
 var operationMutex sync.Mutex
@@ -372,7 +373,10 @@ func restartTailscaleAfterResponse() {
 	go func() {
 		defer operationMutex.Unlock()
 		time.Sleep(restartDelay)
-		if restartErr := NewCli().Restart(); restartErr != nil {
+
+		ctx, cancel := context.WithTimeout(context.Background(), restartTimeout)
+		defer cancel()
+		if restartErr := NewCli().RestartAfterUpdate(ctx); restartErr != nil {
 			log.Errorf("tailscale updated but failed to restart: %s", restartErr)
 		}
 	}()
