@@ -5,6 +5,8 @@ using namespace maix::sys;
 
 extern kvm_sys_state_t kvm_sys_state;
 extern kvm_oled_state_t kvm_oled_state;
+void OLED_Display_On(void);
+void OLED_Display_Off(void);
 
 void kvm_init_cube_ui(void)
 {
@@ -490,6 +492,21 @@ void oled_auto_sleep_time_update(void)
 	kvm_oled_state.oled_sleep_start = time::time_ms();
 }
 
+static void oled_set_sleep_state(uint8_t sleeping)
+{
+	if(kvm_oled_state.oled_sleep_state == sleeping){
+		return;
+	}
+
+	if(sleeping){
+		OLED_Clear();
+		OLED_Display_Off();
+	} else {
+		OLED_Display_On();
+	}
+	kvm_oled_state.oled_sleep_state = sleeping;
+}
+
 void oled_auto_sleep(void)
 {
 	uint16_t tmp16;
@@ -533,13 +550,15 @@ void oled_auto_sleep(void)
 	if(kvm_oled_state.page == 0){
 		if(kvm_oled_state.oled_sleep_param < OLED_SLEEP_DELAY_MIN){
 			if(sleep_close_signal == 1){
+				oled_set_sleep_state(0);
 				kvm_sys_state.sub_page = 0;
 			}
 		} else {
 			if((time::time_ms() - kvm_oled_state.oled_sleep_start)/1000 >= kvm_oled_state.oled_sleep_param){
-				// kvm_oled_state.oled_sleep_state = 1;
+				oled_set_sleep_state(1);
 				kvm_sys_state.sub_page = 1;
 			} else {
+				oled_set_sleep_state(0);
 				kvm_sys_state.sub_page = 0;
 			}
 		}
