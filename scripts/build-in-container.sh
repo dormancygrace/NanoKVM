@@ -75,7 +75,7 @@ echo "::endgroup::"
 
 echo "::group::server: cross-compile NanoKVM-Server"
 cd "$NANOKVM_PATH/server"
-./build.sh
+GO_LDFLAGS="-s -w" ./build.sh
 echo "::endgroup::"
 
 # support/sg2002/build reports "Build Error!" without a non-zero exit status for
