@@ -23,13 +23,10 @@ stop_process() {
         return
     fi
 
-    killall -INT "$process" 2>/dev/null || true
-    if wait_for_exit "$process" 20; then
-        return
-    fi
-
+    # Non-interactive shells start asynchronous jobs with SIGINT ignored.
+    # SIGTERM is handled by NanoKVM-Server and reaches detached services.
     killall -TERM "$process" 2>/dev/null || true
-    if wait_for_exit "$process" 5; then
+    if wait_for_exit "$process" 10; then
         return
     fi
 
@@ -44,11 +41,16 @@ stop_services() {
     rm -rf /tmp/kvm_system /tmp/server
 }
 
+start_background() {
+    executable="$1"
+    nohup "$executable" </dev/null >/dev/null 2>&1 &
+}
+
 start_services() {
     cp -r /kvmapp/kvm_system /tmp/
     if [ -f /kvmapp/kvm_new_app ]; then
         touch /tmp/.nanokvm_migrating
-        /tmp/kvm_system/kvm_system &
+        start_background /tmp/kvm_system/kvm_system
 
         # The legacy migration invokes this init script recursively and starts
         # the server itself. Wait for that single migration path to finish.
@@ -63,13 +65,13 @@ start_services() {
         done
         rm -f /tmp/.nanokvm_migrating
     else
-        /tmp/kvm_system/kvm_system &
+        start_background /tmp/kvm_system/kvm_system
     fi
 
     if ! pidof NanoKVM-Server >/dev/null 2>&1; then
         rm -rf /tmp/server
         cp -r /kvmapp/server /tmp/
-        /tmp/server/NanoKVM-Server &
+        start_background /tmp/server/NanoKVM-Server
     fi
 }
 
