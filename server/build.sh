@@ -45,6 +45,16 @@ export GOEXPERIMENT=boringcrypto
 export CC="$CC_COMPILER"
 export CGO_CFLAGS="$CGO_CFLAGS_OPTS"
 
+# A release build compiles libkvm immediately before the server and stages it
+# under kvmapp/. Link against that fresh ABI instead of the tracked development
+# copy in server/dl_lib, while keeping the latter as a standalone-build fallback.
+LINK_LIB_DIR="$PWD/dl_lib"
+FRESH_LIB_DIR="$PWD/../kvmapp/server/dl_lib"
+if [ -f "$FRESH_LIB_DIR/libkvm.so" ]; then
+    LINK_LIB_DIR="$FRESH_LIB_DIR"
+fi
+export CGO_LDFLAGS="-L$LINK_LIB_DIR -Wl,-rpath-link,$LINK_LIB_DIR -Wl,-rpath-link,$PWD/dl_lib ${CGO_LDFLAGS:-}"
+
 go build -o "$BINARY_NAME" -v
 
 if [ -f "$BINARY_NAME" ]; then
