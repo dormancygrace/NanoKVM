@@ -2000,8 +2000,15 @@ void kvmv_deinit()
     }
 
     set_hdmi_capture_enabled(0);
-    cam->close();
-    mmf_deinit();
+    /*
+     * kvmv owns the whole MMF process lifetime. JPEG takes an additional MMF
+     * reference while active, so a balanced single decrement can leave all
+     * global JPEG/VENC/VB pools alive when Direct was selected last. There are
+     * no workers left at this point; force the process-wide teardown. MMF
+     * closes encoders before the camera channel so an encoder cannot retain a
+     * frame whose VI producer has already been destroyed.
+     */
+    mmf_try_deinit(true);
     free_all_kvmv_data();
     pthread_mutex_destroy(&vi_mutex);
 }

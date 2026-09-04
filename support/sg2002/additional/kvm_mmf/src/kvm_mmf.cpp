@@ -1005,9 +1005,16 @@ _need_exit_sys_and_deinit_vi:
 static void _mmf_deinit(void)
 {
 	UNUSED(cvi_ive_deinit);
-	mmf_del_vi_channel_all();
+	/*
+	 * Encoders can still own input frames from VI. Tear them down before VI so
+	 * those frames are returned while their producer is still alive. JPEG also
+	 * owns a separate MMF reference; forced process teardown has already reset
+	 * the reference count, so its public deinit can safely release its pools
+	 * here without recursively entering this function.
+	 */
 	mmf_del_venc_channel_all();
 	mmf_enc_jpg_deinit(0);
+	mmf_del_vi_channel_all();
 	_try_release_venc_all();
 	_try_release_vpss_all();
 	mmf_vi_deinit();
@@ -1815,11 +1822,11 @@ int mmf_enc_jpg_deinit(int ch)
 		_destroy_vb_pool(priv.enc_jpg_output_pool_id);
 		priv.enc_jpg_output_pool_id = -1;
 		_destroy_vb_pool(priv.enc_jpg_input_pool_id);
-		priv.enc_jpg_output_pool_id = -1;
+		priv.enc_jpg_input_pool_id = -1;
 		break;
 	case PIXEL_FORMAT_NV21:
 		_destroy_vb_pool(priv.enc_jpg_input_pool_id);
-		priv.enc_jpg_output_pool_id = -1;
+		priv.enc_jpg_input_pool_id = -1;
 		break;
 	default:
 		break;
